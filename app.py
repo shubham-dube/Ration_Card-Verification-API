@@ -4,16 +4,18 @@ import uuid
 import base64
 from bs4 import BeautifulSoup
 import html
+from asgiref.wsgi import WsgiToAsgi
 
 app = Flask(__name__)
+asgi_app = WsgiToAsgi(app)
 
-sessions = {}
-
-baseUrl = "https://nfsa.gov.in/public/"
+rationSessions = {}
 
 @app.route("/api/v1/getCaptcha", methods=["GET"])
 def getCaptcha():
     try:
+        baseUrl = "https://nfsa.gov.in/public/"
+
         session = requests.Session()
         id = str(uuid.uuid4())
 
@@ -54,7 +56,7 @@ def getCaptcha():
             "captchaKey": "ctl00$ContentPlaceHolder1$txtCaptcha",
         }
 
-        sessions[id] = {
+        rationSessions[id] = {
             "session": session,
             "postData": postData,
             "loginKeys": loginKeys
@@ -62,14 +64,14 @@ def getCaptcha():
         response = session.get(imageUrl)
         captchaBase64 = base64.b64encode(response.content).decode("utf-8")
 
-        # # For Testing Purpose only
+        # For Testing Purpose only
 
-        # imageString = f'<img src="data:image/png;base64,{captchaBase64}" alt="captcha">'
-        # with open('captcha.html','w') as f:
-        #     f.write(imageString)   
-        #     f.close()
+        imageString = f'<img src="data:image/png;base64,{captchaBase64}" alt="captcha">'
+        with open('captcha.html','w') as f:
+            f.write(imageString)   
+            f.close()
 
-        # #
+        #
 
         jsonResponse = {
             "sessionId": id,
@@ -89,7 +91,7 @@ def getRationCardDet():
         rcNo = request.json.get("rationCardNumber")
         captcha = request.json.get("captcha")
 
-        user = sessions.get(sessionId)
+        user = rationSessions.get(sessionId)
         postData = user['postData']
         loginKeys = user['loginKeys']
         postData[loginKeys['searchKey']] = rcNo
@@ -161,6 +163,6 @@ def getRationCardDet():
         print(e)
         return jsonify({"error": "Error in fetching Ration Card Details. Please Retry Again"})
 
-
 if __name__ == "__main__":
-    app.run()
+    import uvicorn
+    uvicorn.run(asgi_app, host='0.0.0.0', port=5001)
